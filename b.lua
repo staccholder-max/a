@@ -204,7 +204,7 @@ local function sendWebhook(title, fields, color)
             title = title,
             color = color,
             fields = fields,
-            footer = { text = "made by Jung Ganmyeon | Enhanced Script" }
+            footer = { text = "BBNO$ Team | Star Farmer V1" }
         }}
     }
 
