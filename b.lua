@@ -1,6 +1,35 @@
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 
 -- ==========================================
+-- CONFIGURATION FALLBACK (In case getgenv is missing)
+-- ==========================================
+getgenv().Config = getgenv().Config or {
+    ["Link Wh"] = "",
+    ["Ping Id"] = "",
+    ["Check Quest"] = true,
+    ["Auto Change Acc"] = true,
+    ["Auto Buy Egg Ticket"] = true,
+    ["Auto Feed"] = {
+        ["Enable"] = true,
+        ["Auto Buy Treat"] = true,
+        ["Bee Amount"] = 7,
+        ["Bee Level"] = 7,
+        ["Bee Food"] = {
+            Neonberry = true, MoonCharm = true, GingerbreadBear = true,
+            Bitterberry = true, Pineapple = true, Strawberry = true,
+            Blueberry = true, SunflowerSeed = true, Treat = true
+        }
+    },
+    ["Auto Hatch"] = {
+        ["Enable"] = true,
+        ["Egg Hatch"] = {"Basic", "Silver", "Gold", "Diamond"} 
+    },
+    ["Auto Printer"] = {
+        ["Enable"] = true
+    }
+}
+
+-- ==========================================
 -- SERVICES & VARIABLES
 -- ==========================================
 local Config = getgenv().Config
@@ -155,6 +184,8 @@ local function calculateProgressAndETA()
 end
 
 local function sendWebhook(title, fields, color)
+    if not Config["Link Wh"] or Config["Link Wh"] == "" then return end
+    
     local progress, eta = calculateProgressAndETA()
     
     -- Inject universal fields
@@ -162,8 +193,13 @@ local function sendWebhook(title, fields, color)
     table.insert(fields, { name = "Star Egg Progress", value = progress, inline = true })
     table.insert(fields, { name = "Estimated Time Left", value = eta, inline = true })
 
+    local pingText = ""
+    if Config["Ping Id"] and Config["Ping Id"] ~= "" then
+        pingText = "<@" .. tostring(Config["Ping Id"]) .. ">"
+    end
+
     local data = {
-        content = "<@" .. tostring(Config["Ping Id"] or "") .. ">",
+        content = pingText,
         embeds = {{
             title = title,
             color = color,
@@ -401,14 +437,20 @@ local function checkQuest()
     if not completed then return end
 
     for _, q in pairs(completed) do
-        if tostring(q) == "Seven To Seven" and not REPORTED_QUESTS["Seven To Seven"] then
-            sendWebhook("🐝 Quest 'Seven To Seven' Completed!", {
-                { name = "Bee Count", value = tostring(#getBees()), inline = true }
-            }, 16776960)
+        local questName = tostring(q)
+        
+        -- If this is a quest we track, and we haven't reported it yet
+        if QUEST_WEIGHTS[questName] and not REPORTED_QUESTS[questName] then
+            REPORTED_QUESTS[questName] = true
             
-            REPORTED_QUESTS["Seven To Seven"] = true
-            QUEST_DONE = true
-            return
+            if questName == "Seven To Seven" then
+                sendWebhook("🐝 Final Quest 'Seven To Seven' Completed!", {
+                    { name = "Bee Count", value = tostring(#getBees()), inline = true }
+                }, 16776960)
+                QUEST_DONE = true
+            else
+                sendWebhook("📜 Quest Completed: " .. questName, {}, 3447003) -- Blue
+            end
         end
     end
 end
@@ -517,6 +559,15 @@ end
 -- ==========================================
 -- MAIN LOOP
 -- ==========================================
+
+-- Send initialization webhook so you know it loaded
+task.spawn(function()
+    task.wait(2) -- Quick buffer to let cache load slightly
+    sendWebhook("🚀 Script Executed Successfully!", {
+        { name = "Status", value = "Hive Manager & Tracker Started", inline = false }
+    }, 3447003)
+end)
+
 while true do
     autoBuyEggTicket()
     checkStarSign()
